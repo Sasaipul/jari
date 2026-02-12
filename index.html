@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Escape - Jangan Kena!</title>
+    <style>
+        body { margin: 0; background: #050505; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        canvas { border: 2px solid #333; box-shadow: 0 0 20px rgba(0, 255, 255, 0.2); cursor: none; }
+        #ui { position: absolute; top: 20px; left: 20px; pointer-events: none; }
+        .stats { font-size: 24px; font-weight: bold; text-shadow: 0 0 10px rgba(0, 255, 255, 0.5); }
+        #msg { position: absolute; text-align: center; display: none; }
+        button { background: #00ffff; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; border-radius: 5px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        <div class="stats">Skor: <span id="score">0</span></div>
+        <div style="font-size: 14px; opacity: 0.7;">Hindari kotak Merah! Ambil Kuning untuk Bom!</div>
+    </div>
+
+    <div id="msg">
+        <h1 id="status">GAME OVER</h1>
+        <p>Skor Akhir: <span id="finalScore">0</span></p>
+        <button onclick="resetGame()">Main Lagi</button>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const msg = document.getElementById('msg');
+    const finalScoreEl = document.getElementById('finalScore');
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    let player = { x: canvas.width/2, y: canvas.height/2, size: 15, color: '#00ffff' };
+    let enemies = [];
+    let powerUps = [];
+    let score = 0;
+    let gameOver = false;
+    let enemySpeed = 2;
+    let spawnRate = 1000;
+    let lastSpawn = 0;
+
+    // Ikuti Mouse/Touch
+    window.addEventListener('mousemove', (e) => {
+        if(!gameOver) {
+            player.x = e.clientX;
+            player.y = e.clientY;
+        }
+    });
+
+    function spawnEnemy() {
+        const size = 20;
+        let x, y;
+        // Muncul dari luar layar
+        if (Math.random() < 0.5) {
+            x = Math.random() < 0.5 ? -size : canvas.width + size;
+            y = Math.random() * canvas.height;
+        } else {
+            x = Math.random() * canvas.width;
+            y = Math.random() < 0.5 ? -size : canvas.height + size;
+        }
+        enemies.push({ x, y, size, speed: enemySpeed + Math.random() });
+    }
+
+    function spawnPowerUp() {
+        powerUps.push({
+            x: Math.random() * (canvas.width - 20) + 10,
+            y: Math.random() * (canvas.height - 20) + 10,
+            size: 15
+        });
+    }
+
+    function update(time = 0) {
+        if (gameOver) return;
+
+        ctx.fillStyle = 'rgba(5, 5, 5, 0.3)'; // Efek trail
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Update Musuh
+        if (time - lastSpawn > spawnRate) {
+            spawnEnemy();
+            lastSpawn = time;
+            if (spawnRate > 300) spawnRate -= 5; // Makin lama makin cepat
+            score++;
+            scoreEl.innerText = score;
+            if (score % 10 === 0) spawnPowerUp();
+        }
+
+        // Draw Player
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = player.color;
+        ctx.fillStyle = player.color;
+        ctx.fillRect(player.x - player.size/2, player.y - player.size/2, player.size, player.size);
+
+        // Logika Musuh
+        enemies.forEach((enemy, index) => {
+            // Kejar player
+            const dx = player.x - enemy.x;
+            const dy = player.y - enemy.y;
+            const angle = Math.atan2(dy, dx);
+            enemy.x += Math.cos(angle) * enemy.speed;
+            enemy.y += Math.sin(angle) * enemy.speed;
+
+            // Gambar Musuh
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = 'red';
+            ctx.fillStyle = '#ff4444';
+            ctx.fillRect(enemy.x - enemy.size/2, enemy.y - enemy.size/2, enemy.size, enemy.size);
+
+            // Cek Tabrakan
+            const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+            if (dist < (player.size/2 + enemy.size/2)) {
+                endGame();
+            }
+        });
+
+        // Logika Power-Up
+        powerUps.forEach((p, index) => {
+            ctx.shadowColor = 'yellow';
+            ctx.fillStyle = '#ffff00';
+            ctx.fillRect(p.x, p.y, p.size, p.size);
+
+            const dist = Math.hypot(player.x - p.x, player.y - p.y);
+            if (dist < 30) {
+                enemies = []; // Hancurkan semua musuh
+                powerUps.splice(index, 1);
+                score += 5;
+            }
+        });
+
+        requestAnimationFrame(update);
+    }
+
+    function endGame() {
+        gameOver = true;
+        msg.style.display = 'block';
+        finalScoreEl.innerText = score;
+        canvas.style.cursor = 'default';
+    }
+
+    function resetGame() {
+        score = 0;
+        enemies = [];
+        powerUps = [];
+        spawnRate = 1000;
+        gameOver = false;
+        msg.style.display = 'none';
+        canvas.style.cursor = 'none';
+        update();
+    }
+
+    update();
+</script>
+</body>
+</html>
