@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <title>Neon Escape - Jangan Kena!</title>
     <style>
         body { margin: 0; background: #050505; color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; touch-action: none;
@@ -38,6 +39,21 @@
             border-radius: 15px; border: 1px solid #00ffff; z-index: 200; 
             width: 80%; max-width: 300px;
         }
+        #msg h1 { 
+            font-family: 'Press Start 2P', cursive; 
+            font-size: 24px; /* Pixel font biasanya terlihat bagus di ukuran ini */
+            letter-spacing: 2px;
+            line-height: 1.5;
+            text-shadow: 4px 4px 0px #550000; /* Efek bayangan kotak khas pixel */
+            animation: blink 0.9s infinite;
+        }
+
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
         
         button.main-btn { background: #00ffff; border: none; padding: 12px 25px; font-weight: bold; cursor: pointer; border-radius: 5px; margin-top: 15px; color: #000; }
     </style>
@@ -63,6 +79,9 @@
     
 
 <script>
+    document.fonts.load('10pt "Press Start 2P"').then(function() {
+        console.log('Font Pixel Ready!');
+    });
     // --- AUDIO SYSTEM (File Lokal) ---
     const bombSound = new Audio('boom.mp3'); // Pastikan nama file sesuai
     bombSound.preload = 'auto'; // Memuat file di awal agar tidak delay saat diputar
@@ -131,7 +150,7 @@
             ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = "white";
-            ctx.font = "bold 30px Arial";
+            ctx.font = "24px 'Press Start 2P'";
             ctx.textAlign = "center";
             ctx.fillText("GAME PAUSED", canvas.width/2, canvas.height/2);
         } else {
@@ -360,7 +379,7 @@
                 ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = "white";
-                ctx.font = "bold 30px Arial";
+                ctx.font = "24px 'Press Start 2P'";
                 ctx.textAlign = "center";
                 ctx.fillText("GAME PAUSED", canvas.width/2, canvas.height/2);
             }
