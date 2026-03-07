@@ -34,12 +34,24 @@
         canvas { border: 1px solid #333; cursor: none; display: block; }
 
         #msg { 
-            position: absolute; text-align: center; display: none; 
-            background: rgba(0, 0, 0, 0.9); padding: 30px; 
-            border-radius: 15px; border: 1px solid #00ffff; z-index: 200; 
-            width: 80%; max-width: 300px;
+            position: absolute; 
+            text-align: center; 
+            display: none; 
+            background: rgba(0, 0, 0, 0.9); 
+            padding: 30px; 
+            border-radius: 15px; 
+            
+            /* Ganti border biasa dengan ini */
+            border: 2px solid #00ffff; 
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.3); /* Menambah ketegasan garis */
+            
+            z-index: 200; 
+            width: 85%; /* Sedikit diperlebar agar aman */
+            max-width: 320px;
         }
+        
         #msg h1 { 
+            margin-top: 10px !important;
             font-family: 'Press Start 2P', cursive; 
             font-size: 24px; /* Pixel font biasanya terlihat bagus di ukuran ini */
             letter-spacing: 2px;
@@ -331,6 +343,12 @@
     function endGame() {
         gameOver = true;
         msg.style.display = 'block';
+
+        // Memastikan pop-up benar-benar di tengah layar secara vertikal
+        const rect = msg.getBoundingClientRect();
+        msg.style.top = (window.innerHeight / 2 - rect.height / 2) + "px";
+        msg.style.left = (window.innerWidth / 2 - rect.width / 2) + "px";
+
         finalScoreEl.innerText = score;
         if (score > highScore) {
             highScore = score;
