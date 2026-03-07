@@ -94,14 +94,36 @@
     document.fonts.load('10pt "Press Start 2P"').then(function() {
         console.log('Font Pixel Ready!');
     });
-    // --- AUDIO SYSTEM (File Lokal) ---
-    const bombSound = new Audio('boom.mp3'); // Pastikan nama file sesuai
-    bombSound.preload = 'auto'; // Memuat file di awal agar tidak delay saat diputar
+    // --- AUDIO SYSTEM ---
+    const bombSound = new Audio('boom.mp3');
+    bombSound.preload = 'auto';
+    bombSound.load();
+
+    // Fungsi untuk "memancing" audio agar aktif di browser mobile
+    function initAudio() {
+        // Putar sebentar lalu pause untuk membuka blokir autoplay
+        bombSound.play().then(() => {
+            bombSound.pause();
+            bombSound.currentTime = 0;
+            console.log("Audio Unlocked!");
+        }).catch(e => console.log("Menunggu interaksi user..."));
+
+        // Hapus event listener setelah audio terbuka agar hemat memori
+        window.removeEventListener('touchstart', initAudio);
+        window.removeEventListener('mousedown', initAudio);
+    }
+
+    // Jalankan initAudio saat user pertama kali menyentuh atau klik layar
+    window.addEventListener('touchstart', initAudio);
+    window.addEventListener('mousedown', initAudio);
 
     function playBombSound() {
-        // Reset durasi ke awal agar bisa diputar berulang kali dengan cepat
         bombSound.currentTime = 0; 
-        bombSound.play().catch(e => console.log("Audio play blocked: ", e));
+        let playPromise = bombSound.play();
+        
+        if (playPromise !== undefined) {
+            playPromise.catch(e => console.log("Audio play blocked: ", e));
+        }
     }
 
     // --- SETUP AWAL ---
