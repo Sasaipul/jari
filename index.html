@@ -5,11 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Neon Escape - Jangan Kena!</title>
     <style>
+        #pauseBtn { position: absolute; top: 20px; right: 20px; background: rgba(0, 255, 255, 0.2); color: #00ffff; border: 1px solid #00ffff; padding: 10px 15px; font-weight: bold; border-radius: 5px; cursor: pointer; z-index: 20; pointer-events: auto; }
         body { margin: 0; background: #050505; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; }
-        canvas { border: 2px solid #333; box-shadow: 0 0 20px rgba(0, 255, 255, 0.2); cursor: none; }
+        canvas { border: 2px solid #333; box-shadow: 0 0 20px rgba(0, 255, 255, 0.2); cursor: none; touch-action: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
         #ui { position: absolute; top: 20px; left: 20px; pointer-events: none; }
         .stats { font-size: 24px; font-weight: bold; text-shadow: 0 0 10px rgba(0, 255, 255, 0.5); }
-        #msg { position: absolute; text-align: center; display: none; }
+        #msg { position: absolute; text-align: center; display: none; background: rgba(0, 0, 0, 0.8); padding: 20px; border-radius: 15px; border: 1px solid #00ffff; z-index: 10; }
         button { background: #00ffff; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; border-radius: 5px; margin-top: 10px; }
     </style>
 </head>
@@ -17,7 +18,8 @@
 
     <div id="ui">
         <div class="stats">Skor: <span id="score">0</span></div>
-        <div style="font-size: 14px; opacity: 0.7;">Hindari kotak Merah! Ambil Kuning untuk Bom!</div>
+        <div style="font-size: 16px; color: #ffff00;">Skor Tertinggi: <span id="highScore">0</span></div>
+        <div style="font-size: 14px; opacity: 0.7;">Hindari kotak Merah! Ambil kotak Kuning untuk Bom!</div>
     </div>
 
     <div id="msg">
@@ -26,9 +28,70 @@
         <button onclick="resetGame()">Main Lagi</button>
     </div>
 
+    <button id="pauseBtn" onclick="togglePause()">PAUSE(Esc)</button>
+
     <canvas id="gameCanvas"></canvas>
 
 <script>
+    let highScore = localStorage.getItem('neonHighScore') || 0;
+    document.getElementById('highScore').innerText = highScore;
+
+    let powerUpTimer = 0; // Menghitung waktu yang berjalan
+    let powerUpInterval = 10000; // Interval kemunculan (10000ms = 10 detik)
+    
+    let isPaused = false;
+    function togglePause() {
+        if (gameOver) return; // Jangan pause kalau sudah mati
+        
+        isPaused = !isPaused;
+        const btn = document.getElementById('pauseBtn');
+        
+        if (isPaused) {
+            btn.innerText = "RESUME(Esc)";
+            btn.style.background = "rgba(255, 255, 0, 0.5)"; // Berubah warna saat pause
+            btn.style.color = "white";
+            // Opsional: Memberi efek overlay saat pause agar lebih jelas
+            ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "white";
+            ctx.font = "40px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText("GAME PAUSED", canvas.width/2, canvas.height/2);
+        } else {
+            btn.innerText = "PAUSE(Esc)";
+            btn.style.background = "rgba(0, 255, 255, 0.2)";
+            btn.style.color = "#00ffff";
+            update(); // Jalankan kembali loop game
+        }
+    }
+
+    let particles = [];
+    class Particle {
+        constructor(x, y, color) {
+            this.x = x;
+            this.y = y;
+            this.color = color;
+            this.size = Math.random() * 3 + 1;
+            this.speedX = (Math.random() - 0.5) * 10;
+            this.speedY = (Math.random() - 0.5) * 10;
+            this.alpha = 1;
+        }
+        update() {
+            this.x += this.speedX;
+            this.y += this.speedY;
+            this.alpha -= 0.02; 
+        }
+        draw() {
+            ctx.save();
+            ctx.globalAlpha = this.alpha;
+            ctx.fillStyle = this.color;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = this.color;
+            ctx.fillRect(this.x, this.y, this.size, this.size);
+            ctx.restore();
+        }
+    }
+
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const scoreEl = document.getElementById('score');
@@ -47,18 +110,24 @@
     let spawnRate = 1000;
     let lastSpawn = 0;
 
-    // Ikuti Mouse/Touch
-    window.addEventListener('mousemove', (e) => {
-        if(!gameOver) {
-            player.x = e.clientX;
-            player.y = e.clientY;
+    window.addEventListener('touchstart', (e) => handleTouch(e), { passive: false });
+    window.addEventListener('touchmove', (e) => handleTouch(e), { passive: false });
+
+    function handleTouch(e) {
+        if (!gameOver && !isPaused) {
+            e.preventDefault(); 
+            const touch = e.touches[0];
+            let halfSize = player.size / 2;
+
+            // Terapkan logika pembatas yang sama
+            player.x = Math.max(halfSize, Math.min(touch.clientX, canvas.width - halfSize));
+            player.y = Math.max(halfSize, Math.min(touch.clientY, canvas.height - halfSize));
         }
-    });
+    }
 
     function spawnEnemy() {
         const size = 20;
         let x, y;
-        // Muncul dari luar layar
         if (Math.random() < 0.5) {
             x = Math.random() < 0.5 ? -size : canvas.width + size;
             y = Math.random() * canvas.height;
@@ -69,28 +138,52 @@
         enemies.push({ x, y, size, speed: enemySpeed + Math.random() });
     }
 
-    function spawnPowerUp() {
-        powerUps.push({
-            x: Math.random() * (canvas.width - 20) + 10,
-            y: Math.random() * (canvas.height - 20) + 10,
-            size: 15
-        });
+   function spawnPowerUp() {
+        if (powerUps.length === 0) {
+            powerUps.push({ 
+                x: Math.random() * (canvas.width - 60) + 30, 
+                y: Math.random() * (canvas.height - 60) + 30, 
+                size: 15 
+            });
+            // Atur interval berikutnya secara acak antara 10 - 20 detik
+            powerUpInterval = 10000 + Math.random() * 10000;
+            powerUpTimer = performance.now(); // Reset timer ke waktu saat ini
+        }
     }
 
     function update(time = 0) {
-        if (gameOver) return;
+        if (gameOver || isPaused) return; // Tambahkan isPaused di sini
 
-        ctx.fillStyle = 'rgba(5, 5, 5, 0.3)'; // Efek trail
+        ctx.fillStyle = 'rgba(5, 5, 5, 0.3)'; 
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // Gambar garis tepi neon sederhana
+        ctx.strokeStyle = '#00ffff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(0, 0, canvas.width, canvas.height);
 
-        // Update Musuh
+       // --- LOGIKA WAKTU POWER-UP ---
+        if (powerUps.length === 0) {
+            // Pastikan powerUpTimer sudah terinisialisasi
+            if (powerUpTimer === 0) powerUpTimer = time; 
+
+            if (time - powerUpTimer > powerUpInterval) {
+                spawnPowerUp();
+                // Kita tidak reset timer di sini, tapi nanti saat DIAMBIL
+                // Agar jeda 10 detik dihitung sejak kotak HILANG
+            }
+        } else {
+            // Selama kotak masih ada, kunci timer agar tidak menghitung mundur
+            powerUpTimer = time;
+        }
+
+        // Update Musuh & Spawn
         if (time - lastSpawn > spawnRate) {
             spawnEnemy();
             lastSpawn = time;
-            if (spawnRate > 300) spawnRate -= 5; // Makin lama makin cepat
+            if (spawnRate > 300) spawnRate -= 5;
             score++;
             scoreEl.innerText = score;
-            if (score % 10 === 0) spawnPowerUp();
+    
         }
 
         // Draw Player
@@ -99,39 +192,58 @@
         ctx.fillStyle = player.color;
         ctx.fillRect(player.x - player.size/2, player.y - player.size/2, player.size, player.size);
 
+        // Update Partikel (PENTING: Di dalam loop update)
+        particles.forEach((particle, index) => {
+            if (particle.alpha <= 0) {
+                particles.splice(index, 1);
+            } else {
+                particle.update();
+                particle.draw();
+            }
+        });
+
         // Logika Musuh
         enemies.forEach((enemy, index) => {
-            // Kejar player
             const dx = player.x - enemy.x;
             const dy = player.y - enemy.y;
             const angle = Math.atan2(dy, dx);
             enemy.x += Math.cos(angle) * enemy.speed;
             enemy.y += Math.sin(angle) * enemy.speed;
 
-            // Gambar Musuh
             ctx.shadowBlur = 10;
             ctx.shadowColor = 'red';
             ctx.fillStyle = '#ff4444';
             ctx.fillRect(enemy.x - enemy.size/2, enemy.y - enemy.size/2, enemy.size, enemy.size);
 
-            // Cek Tabrakan
             const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
-            if (dist < (player.size/2 + enemy.size/2)) {
-                endGame();
-            }
+            if (dist < (player.size/2 + enemy.size/2)) endGame();
         });
 
         // Logika Power-Up
         powerUps.forEach((p, index) => {
+            ctx.shadowBlur = 15;
             ctx.shadowColor = 'yellow';
             ctx.fillStyle = '#ffff00';
             ctx.fillRect(p.x, p.y, p.size, p.size);
 
             const dist = Math.hypot(player.x - p.x, player.y - p.y);
             if (dist < 30) {
-                enemies = []; // Hancurkan semua musuh
+                // 1. Buat ledakan partikel
+                for(let i = 0; i < 20; i++) particles.push(new Particle(p.x, p.y, '#ffff00'));
+                enemies.forEach(e => {
+                    for(let i = 0; i < 5; i++) particles.push(new Particle(e.x, e.y, '#ff4444'));
+                });
+
+                // 2. Bersihkan musuh
+                enemies = []; 
                 powerUps.splice(index, 1);
                 score += 5;
+
+                // 3. --- PENTING: RESET TIMER DI SINI ---
+                // Dengan ini, hitungan 10 detik dimulai LAGI dari nol setelah kotak diambil
+                powerUpTimer = performance.now(); 
+
+                if (navigator.vibrate) navigator.vibrate(50);
             }
         });
 
@@ -143,18 +255,64 @@
         msg.style.display = 'block';
         finalScoreEl.innerText = score;
         canvas.style.cursor = 'default';
+        if (score > highScore) {
+            highScore = score;
+            localStorage.setItem('neonHighScore', highScore);
+            document.getElementById('highScore').innerText = highScore;
+            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+        } else {
+            if (navigator.vibrate) navigator.vibrate(200);
+        }
     }
 
     function resetGame() {
-        score = 0;
-        enemies = [];
-        powerUps = [];
-        spawnRate = 1000;
-        gameOver = false;
-        msg.style.display = 'none';
-        canvas.style.cursor = 'none';
-        update();
-    }
+            isPaused = false; 
+            document.getElementById('pauseBtn').innerText = "PAUSE(Esc)";
+            document.getElementById('pauseBtn').style.background = "rgba(0, 255, 255, 0.2)";
+            score = 0;
+            scoreEl.innerText = score; // Pastikan skor di UI juga kembali ke 0
+            enemies = [];
+            powerUps = [];
+            particles = []; 
+            spawnRate = 1000;
+            gameOver = false;
+            msg.style.display = 'none';
+            canvas.style.cursor = 'none';
+            powerUpTimer = performance.now(); // Reset timer ke waktu saat ini
+
+            // RESET POSISI KE TENGAH LAYAR
+            player.x = canvas.width / 2;
+            player.y = canvas.height / 2;
+
+            update();
+        }
+
+    window.addEventListener('resize', () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        player.x = canvas.width / 2;
+        player.y = canvas.height / 2;
+    });
+
+    // Kontrol Keyboard untuk Desktop
+    window.addEventListener('keydown', (e) => {
+        if (e.key === "Escape") {
+            togglePause();
+        }
+    });
+
+   window.addEventListener('mousemove', (e) => { 
+        if(!gameOver && !isPaused) { 
+            // Hitung batas aman (setengah ukuran player)
+            let halfSize = player.size / 2;
+
+            // Batasi gerakan agar tidak keluar tepi kiri/kanan
+            player.x = Math.max(halfSize, Math.min(e.clientX, canvas.width - halfSize));
+            
+            // Batasi gerakan agar tidak keluar tepi atas/bawah
+            player.y = Math.max(halfSize, Math.min(e.clientY, canvas.height - halfSize));
+        } 
+    });
 
     update();
 </script>
