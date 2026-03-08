@@ -6,6 +6,29 @@
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <title>Neon Escape - Jangan Kena!</title>
     <style>
+
+        /* Gaya untuk Layar Start */
+        #startScreen {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(10, 10, 25, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 300;
+        }
+
+        #startScreen h1 {
+            font-family: 'Press Start 2P', cursive;
+            color: #00ffff;
+            font-size: 30px;
+            text-align: center;
+            text-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+            margin-bottom: 30px;
+        }
+        
         body { margin: 0; background: #050505; color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; touch-action: none;
             -webkit-touch-callout: none;
             -webkit-user-select: none;
@@ -87,6 +110,14 @@
 
     <button id="pauseBtn">PAUSE (Esc)</button>
 
+    <div id="startScreen">
+        <h1>NEON<br>ESCAPE</h1>
+        <button class="main-btn" onclick="startGame()">START GAME</button>
+        <div class="hint" style="margin-top: 20px; text-align: center; opacity: 1;">
+            Gerakan player menggunakan mouse atau sentuhan layar.<br>
+        </div>
+    </div>
+
     <canvas id="gameCanvas"></canvas>
     
 
@@ -127,36 +158,60 @@
     }
 
     // --- SETUP AWAL ---
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    const scoreEl = document.getElementById('score');
-    const msg = document.getElementById('msg');
-    const finalScoreEl = document.getElementById('finalScore');
-    const pauseBtn = document.getElementById('pauseBtn');
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score');
+const msg = document.getElementById('msg');
+const finalScoreEl = document.getElementById('finalScore');
+const pauseBtn = document.getElementById('pauseBtn');
+const startScreen = document.getElementById('startScreen'); // Tambahkan ini
 
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-    let highScore = localStorage.getItem('neonHighScore') || 0;
-    document.getElementById('highScore').innerText = highScore;
+let highScore = localStorage.getItem('neonHighScore') || 0;
+document.getElementById('highScore').innerText = highScore;
 
-    let player = { x: canvas.width/2, y: canvas.height/2, size: 15, color: '#00ffff' };
-    let enemies = [];
-    let powerUps = [];
-    let particles = [];
-    let score = 0;
-    let gameOver = false;
-    let isPaused = false;
-    let enemySpeed = 2;
-    let spawnRate = 1000;
-    let lastSpawn = 0;
-    
-    let powerUpTimer = 0;
-    let powerUpInterval = 10000;
+let hyperModeTextTimer = 0; // Timer untuk menampilkan teks "HYPER MODE!"
+let isEasterEggActive = false;
+let hue = 0; // Untuk warna pelangi
+let player = { x: canvas.width/2, y: canvas.height/2, size: 15, color: '#00ffff' };
+let enemies = [];
+let powerUps = [];
+let particles = [];
+let score = 0;
+let gameOver = false;
+let isPaused = false;
+let gameStarted = false; // Status baru: Game belum dimulai
+let enemySpeed = 2;
+let spawnRate = 1000;
+let lastSpawn = 0;
+let powerUpTimer = 0;
+let powerUpInterval = 10000;
+
+// --- FUNGSI START GAME ---
+    function startGame() {
+        gameStarted = true;
+        startScreen.style.display = 'none';
+        
+        // Inisialisasi audio saat klik
+        bombSound.play().then(() => {
+            bombSound.pause();
+            bombSound.currentTime = 0;
+        }).catch(e => console.log("Audio Unlocked"));
+
+        resetGame(); 
+    }
 
     function drawGrid() {
-        ctx.strokeStyle = 'rgba(0, 255, 255, 0.05)';
-        ctx.lineWidth = 1;
+        // Jika Easter Egg aktif, warna grid mengikuti 'hue' pelangi player dengan transparansi rendah
+        // Jika tidak, gunakan warna biru neon redup seperti biasa
+        ctx.strokeStyle = isEasterEggActive 
+            ? `hsla(${hue}, 100%, 50%, 0.15)` 
+            : 'rgba(0, 255, 255, 0.05)';
+        
+        ctx.lineWidth = isEasterEggActive ? 2 : 1; // Garis sedikit lebih tebal saat Easter Egg
+        
         const gridSize = 50;
         for (let x = 0; x < canvas.width; x += gridSize) {
             ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
@@ -166,13 +221,10 @@
         }
     }
 
-    // --- LOGIKA TOMBOL PAUSE (MOBILE & DESKTOP) ---
+    // --- LOGIKA TOMBOL PAUSE ---
     function togglePause(e) {
-        if (e) {
-            e.preventDefault();
-            e.stopPropagation(); // Mencegah sentuhan tembus ke player
-        }
-        if (gameOver) return;
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        if (gameOver || !gameStarted) return; // Tidak bisa pause jika belum mulai
         
         isPaused = !isPaused;
         if (isPaused) {
@@ -184,7 +236,7 @@
             ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = "white";
-            ctx.font = "24px 'Press Start 2P'";
+            ctx.font = "20px 'Press Start 2P'";
             ctx.textAlign = "center";
             ctx.fillText("GAME PAUSED", canvas.width/2, canvas.height/2);
         } else {
@@ -196,15 +248,12 @@
         }
     }
 
-    // Listener khusus touch agar responsif di HP
     pauseBtn.addEventListener('touchstart', togglePause, { passive: false });
-    pauseBtn.addEventListener('click', (e) => {
-        if (e.pointerType !== 'touch') togglePause(e);
-    });
+    pauseBtn.addEventListener('click', (e) => { if (e.pointerType !== 'touch') togglePause(e); });
 
     // --- KONTROL PLAYER ---
     function movePlayer(clientX, clientY) {
-        if (gameOver || isPaused) return;
+        if (gameOver || isPaused || !gameStarted) return;
         let halfSize = player.size / 2;
         player.x = Math.max(halfSize, Math.min(clientX, canvas.width - halfSize));
         player.y = Math.max(halfSize, Math.min(clientY, canvas.height - halfSize));
@@ -218,7 +267,7 @@
 
     window.addEventListener('keydown', (e) => { if (e.key === "Escape") togglePause(); });
 
-    // --- LOGIKA GAME ---
+    // --- PARTICLE & SPAWN ---
     class Particle {
         constructor(x, y, color) {
             this.x = x; this.y = y; this.color = color;
@@ -257,98 +306,97 @@
                 y: Math.random() * (canvas.height - 60) + 30, 
                 size: 20 
             });
-             // Atur interval berikutnya secara acak antara 10 - 20 detik
             powerUpInterval = 10000 + Math.random() * 5000;
-            powerUpTimer = performance.now(); // Reset timer ke waktu saat ini
+            powerUpTimer = performance.now();
         }
     }
 
+    // --- MAIN LOOP ---
     function update(time = 0) {
-        if (gameOver || isPaused) return;
+        if (gameOver || isPaused || !gameStarted) return;
 
-        // 1. BACKGROUND BARU: Biru Gelap dengan Efek Jejak (rgba)
-        ctx.fillStyle = 'rgba(10, 10, 25, 0.7)'; // Warna biru sangat gelap
+        // Cek Easter Egg
+        if (score >= 200 && !isEasterEggActive) {
+            isEasterEggActive = true;
+            hyperModeTextTimer = 120;
+            
+            // Efek kilatan putih sebentar di layar saat transisi
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+        }
+
+        ctx.fillStyle = 'rgba(10, 10, 25, 0.7)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+        drawGrid();
 
-        // 2. MENGGAMBAR GRID (Latar Belakang)
-        ctx.strokeStyle = 'rgba(0, 255, 255, 0.05)'; // Garis cyan sangat tipis
-        ctx.lineWidth = 1;
-        const gridSize = 50;
-        
-        for (let x = 0; x < canvas.width; x += gridSize) {
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, canvas.height);
-            ctx.stroke();
-        }
-        for (let y = 0; y < canvas.height; y += gridSize) {
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(canvas.width, y);
-            ctx.stroke();
-        }
-
-        // --- LOGIKA KENAIKAN KECEPATAN SETIAP 5 DETIK ---
         if (!window.lastSpeedUpdate) window.lastSpeedUpdate = time;
         if (time - window.lastSpeedUpdate > 5000) {
             enemySpeed += 0.3; 
             window.lastSpeedUpdate = time;
         }
 
-        // Power-up Timer Logic
         if (powerUps.length === 0) {
             if (powerUpTimer === 0) powerUpTimer = time;
             if (time - powerUpTimer > powerUpInterval) {
                 spawnPowerUp();
                 powerUpTimer = time;
             }
-        } else {
-            powerUpTimer = time;
         }
 
-        // Spawn Enemies
         if (time - lastSpawn > spawnRate) {
             spawnEnemy();
             lastSpawn = time;
             if (spawnRate > 350) spawnRate -= 3;
-            score++;
+            // Di dalam loop spawn enemy
+            score += isEasterEggActive ? 2 : 1;
             scoreEl.innerText = score;
         }
 
-        // Draw Player
-        ctx.shadowBlur = 15; ctx.shadowColor = player.color;
+        // Efek Easter Egg pada Player
+        if (isEasterEggActive) {
+            hue = (hue + 2) % 360; // Berputar lewat warna pelangi
+            player.color = `hsl(${hue}, 100%, 50%)`;
+            
+            // Tambahkan partikel jejak (trail) secara otomatis
+            if (time % 2 === 0) { // Muncul setiap 2 frame agar tidak terlalu berat
+                particles.push(new Particle(player.x, player.y, player.color));
+            }
+        }
+
+        // --- Bagian Gambar Player ---
+        // Gunakan efek sinar yang lebih kuat (25-30) jika Easter Egg aktif
+        ctx.shadowBlur = isEasterEggActive ? 25 : 15; 
+        ctx.shadowColor = player.color;
         ctx.fillStyle = player.color;
+        
         ctx.fillRect(player.x - player.size/2, player.y - player.size/2, player.size, player.size);
+        
+        // Reset shadow agar tidak memengaruhi objek lain setelah ini
         ctx.shadowBlur = 0;
 
-        // Particles
         particles.forEach((p, i) => {
             p.update(); p.draw();
             if (p.alpha <= 0) particles.splice(i, 1);
         });
 
-        // Enemies Logic
         enemies.forEach((en, i) => {
             const angle = Math.atan2(player.y - en.y, player.x - en.x);
             en.x += Math.cos(angle) * en.speed;
             en.y += Math.sin(angle) * en.speed;
-
             ctx.fillStyle = '#ff4444';
             ctx.fillRect(en.x - en.size/2, en.y - en.size/2, en.size, en.size);
-
             if (Math.hypot(player.x - en.x, player.y - en.y) < (player.size/2 + en.size/2)) endGame();
         });
-        
 
-        // Power-Up Logic
         powerUps.forEach((p, i) => {
             ctx.fillStyle = '#ffff00';
             ctx.shadowBlur = 15; ctx.shadowColor = 'yellow';
             ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
             ctx.shadowBlur = 0;
-
             if (Math.hypot(player.x - p.x, player.y - p.y) < 30) {
-                playBombSound(); // Sekarang akan memutar file boom.mp3
+                playBombSound();
                 for(let j=0; j<20; j++) particles.push(new Particle(p.x, p.y, '#ffff00'));
                 enemies.forEach(en => { for(let k=0; k<5; k++) particles.push(new Particle(en.x, en.y, '#ff4444')); });
                 enemies = [];
@@ -359,18 +407,30 @@
             }
         });
 
+        // Menampilkan Teks HYPER MODE
+        if (hyperModeTextTimer > 0) {
+            ctx.save();
+            ctx.fillStyle = `hsla(${hue}, 100%, 50%, ${hyperModeTextTimer / 120})`; // Warna pelangi yang memudar
+            ctx.font = "24px 'Press Start 2P'";
+            ctx.textAlign = "center";
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = player.color;
+            
+            // Gambar teks di tengah layar
+            ctx.fillText("HYPER MODE", canvas.width / 2, canvas.height / 2 - 20);
+            ctx.font = "12px 'Press Start 2P'";
+            ctx.fillText("ACTIVATED", canvas.width / 2, canvas.height / 2 + 20);
+            
+            ctx.restore();
+            hyperModeTextTimer--; // Kurangi timer setiap frame
+        }
+
         requestAnimationFrame(update);
     }
 
     function endGame() {
         gameOver = true;
         msg.style.display = 'block';
-
-        // Memastikan pop-up benar-benar di tengah layar secara vertikal
-        const rect = msg.getBoundingClientRect();
-        msg.style.top = (window.innerHeight / 2 - rect.height / 2) + "px";
-        msg.style.left = (window.innerWidth / 2 - rect.width / 2) + "px";
-
         finalScoreEl.innerText = score;
         if (score > highScore) {
             highScore = score;
@@ -380,53 +440,34 @@
         if (navigator.vibrate) navigator.vibrate(200);
     }
 
-   function resetGame() {
-        // Pancing audio agar aktif (khusus untuk mobile/browser modern)
-        bombSound.play();
-        bombSound.pause();
-        bombSound.currentTime = 0;
-        score = 0; scoreEl.innerText = 0;
+    function resetGame() {
+        score = 0; scoreEl.innerText = 0; hyperModeTextTimer = 0;
         enemies = []; powerUps = []; particles = [];
         spawnRate = 1000; 
         enemySpeed = 2; 
-        window.lastSpeedUpdate = performance.now(); // Reset timer kecepatan ke waktu sekarang
+        window.lastSpeedUpdate = performance.now();
         gameOver = false; isPaused = false;
         msg.style.display = 'none';
         player.x = canvas.width/2; player.y = canvas.height/2;
         powerUpTimer = performance.now();
         lastSpawn = performance.now(); 
-        powerUpInterval = 10000 + Math.random() * 5000; // Minimal 10 detik pertama
-        powerUpTimer = performance.now();
+        isEasterEggActive = false;
+        player.color = '#00ffff';
         update();
     }
 
     window.addEventListener('resize', () => {
-        const ratioX = player.x / canvas.width;
-        const ratioY = player.y / canvas.height;
-
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
-
-        player.x = canvas.width * ratioX;
-        player.y = canvas.height * ratioY;
-
-        // Jika sedang pause, gambar ulang biar tidak hitam polos
-        if (isPaused || gameOver) {
+        if (!gameStarted) {
             ctx.fillStyle = '#0a0a19';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             drawGrid();
-            if(isPaused) {
-                ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = "white";
-                ctx.font = "24px 'Press Start 2P'";
-                ctx.textAlign = "center";
-                ctx.fillText("GAME PAUSED", canvas.width/2, canvas.height/2);
-            }
         }
     });
 
-    update();
+    // Gambar grid sekali di awal agar layar tidak hitam polos di belakang Start Screen
+    drawGrid();
 </script>
 </body>
 </html>
